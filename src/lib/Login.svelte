@@ -1,5 +1,5 @@
 <script>
-  import { user } from "./user";
+  import { db, user } from "./user";
 
   let username;
   let password;
@@ -18,12 +18,20 @@
 
   function signup() {
     console.log("Attempting signup for:", username);
-    user.create(username, password, ({ err }) => {
+    user.create(username, password, ({ err, pub }) => {
       if (err) {
         console.error("Signup error:", err);
         alert(err);
       } else {
         console.log("Signup successful:", username);
+        // Store public profile data in the "users" node.
+        // This data is persisted via Radisk.
+        db.get("users").get(username).put({
+          alias: username,
+          pub: pub, // Save the public key data (or any other public info)
+          createdAt: Date.now()
+        });
+        // Optionally, automatically log the user in after signup
         login();
       }
     });

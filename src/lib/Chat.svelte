@@ -10,62 +10,70 @@
   let userCount = 0;
   let uniqueAliases = new Set();
 
-  // Get current username from store
+  // Track the current username using a store subscription.
   let currentUser;
   username.subscribe((value) => {
     currentUser = value;
+    if (currentUser) {
+      fetchUsers();
+    } else {
+      // Clear contacts and messages if user logs out.
+      contacts = [];
+      messages = [];
+    }
   });
 
-  // Fetch all registered users and count total users
+  // Fetch all registered users from the "users" node.
   async function fetchUsers() {
     console.log("Fetching users for user:", currentUser);
     uniqueAliases.clear();
     contacts = [];
     userCount = 0;
 
-    db.get("alias")
+    // Fetch profiles from "users" (not "alias").
+    db.get("users")
       .map()
-      .once((data, alias) => {
-        console.log(`Fetched alias: ${alias}`, data);
-        if (data) {
-          uniqueAliases.add(alias);
-          userCount = uniqueAliases.size; // Trigger reactivity
-          userCount += 0; // Ensure Svelte detects change
-          contacts = [...uniqueAliases].filter((a) => a !== currentUser);
+      .once((profile, key) => {
+        console.log(`Fetched profile at key ${key}:`, profile);
+        if (profile && profile.alias) {
+          uniqueAliases.add(profile.alias);
+          userCount = uniqueAliases.size;
+          // Filter out the current user's alias.
+          contacts = [...uniqueAliases].filter((alias) => alias !== currentUser);
           console.log("Updated: userCount=", userCount, "contacts=", contacts);
         }
       });
 
-    // Wait to ensure all aliases are fetched
+    // Wait a short period to allow asynchronous loading.
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    console.log("Final fetch result: userCount=", userCount, "aliases=", [
-      ...uniqueAliases,
-    ]);
+    console.log("Final fetch result: userCount=", userCount, "aliases=", [...uniqueAliases]);
   }
 
-  // Load messages when a contact is selected
+  // Load messages when a contact is selected.
   function loadMessages() {
     if (!selectedContact) return;
+    messages = []; // Clear previous messages.
 
-    messages = [];
+    // Listen for messages between the current user and the selected contact.
     user
       .get("messages")
       .get(`${currentUser}-${selectedContact}`)
       .map()
       .on((data) => {
         if (data) {
+          // Append each new message.
           messages = [...messages, data];
         }
       });
   }
 
-  // Select a contact
+  // Select a contact to chat with.
   function selectContact(contact) {
     selectedContact = contact;
     loadMessages();
   }
 
-  // Handle keyboard selection
+  // For keyboard selection of contacts.
   function handleKeydown(event, contact) {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -73,7 +81,7 @@
     }
   }
 
-  // Send a message
+  // Send a message to the selected contact.
   function sendMessage() {
     if (!messageText.trim() || !selectedContact) return;
 
@@ -84,28 +92,29 @@
       timestamp: Date.now(),
     };
 
-    user.get("messages").get(`${currentUser}-${selectedContact}`).set(message);
-    user.get("messages").get(`${selectedContact}-${currentUser}`).set(message);
+    // Store the message in both directions for synchronicity.
+    user
+      .get("messages")
+      .get(`${currentUser}-${selectedContact}`)
+      .set(message);
+    user
+      .get("messages")
+      .get(`${selectedContact}-${currentUser}`)
+      .set(message);
 
     messageText = "";
   }
 
-  // Handle Enter key for sending messages
+  // Allow sending messages with the Enter key.
   function handleKeypress(event) {
     if (event.key === "Enter") sendMessage();
   }
 
-  // Initialize: Fetch users and check authentication
-  onMount(async () => {
+  onMount(() => {
+    // On mount, if a user is logged in, fetch the available contacts.
     if (currentUser) {
-      await fetchUsers();
+      fetchUsers();
     }
-    username.subscribe(async (value) => {
-      if (value) {
-        console.log("Username changed, re-fetching users:", value);
-        await fetchUsers();
-      }
-    });
   });
 </script>
 
@@ -117,10 +126,7 @@
         <div class="p-4 border-b">
           <h2 class="text-lg font-semibold">Messages</h2>
           <p class="text-sm text-gray-600">Total Users: {userCount}</p>
-          <button
-            on:click={fetchUsers}
-            class="text-blue-500 hover:underline text-sm"
-          >
+          <button on:click={fetchUsers} class="text-blue-500 hover:underline text-sm">
             Refresh Users
           </button>
         </div>
@@ -128,7 +134,7 @@
           {#if contacts.length === 0}
             <div class="p-4 text-gray-500">No contacts found</div>
           {:else}
-            {#each contacts as contact}
+            {#each contacts as contact (contact)}
               <button
                 type="button"
                 class="w-full text-left p-4 cursor-pointer hover:bg-gray-100 focus:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -149,7 +155,7 @@
       <div class="chat-window flex-1 bg-white flex flex-col">
         {#if selectedContact}
           <div class="messages flex-1 overflow-y-auto p-5">
-            {#each messages as msg}
+            {#each messages as msg (msg.timestamp)}
               <div
                 class="message mb-2 p-2 rounded-lg max-w-[70%]"
                 class:sent={msg.sender === currentUser}
@@ -167,10 +173,7 @@
               class="flex-1 p-2 border rounded-l-lg"
               placeholder="Type a message..."
             />
-            <button
-              on:click={sendMessage}
-              class="bg-blue-500 text-white p-2 rounded-r-lg"
-            >
+            <button on:click={sendMessage} class="bg-blue-500 text-white p-2 rounded-r-lg">
               Send
             </button>
           </div>
@@ -191,14 +194,19 @@
   {/if}
 </div>
 
-<!-- <style>
+<style>
   .selected {
-    @apply bg-gray-100 font-semibold;
+    background-color: #f0f0f0;
+    font-weight: 600;
   }
   .message.sent {
-    @apply bg-blue-500 text-white ml-auto;
+    background-color: #3b82f6;
+    color: #fff;
+    margin-left: auto;
   }
   .message.received {
-    @apply bg-gray-200 mr-auto;
+    background-color: #e5e7eb;
+    color: #000;
+    margin-right: auto;
   }
-</style> -->
+</style>

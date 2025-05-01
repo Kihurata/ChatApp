@@ -13,7 +13,4 @@ const gun = Gun({
   on: (msg) => console.log("Server:", msg), // Debug logging
 });
 
-// Log SEA initialization
-console.log("SEA enabled:", !!gun.SEA);
-
 export default gun;
