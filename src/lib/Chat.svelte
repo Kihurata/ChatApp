@@ -1,212 +1,298 @@
 <script>
-  import { user, username, db } from "./user";
   import { onMount } from "svelte";
+  import { user, username, db } from "./user";
+  import ChatMessage from "./ChatMessage.svelte";
   import Login from "./Login.svelte";
 
-  let selectedContact = null;
-  let messages = [];
-  let messageText = "";
+  let currentUser = "";
+  let selectedContact = "";
   let contacts = [];
   let userCount = 0;
   let uniqueAliases = new Set();
+  let messages = [];
 
-  // Track the current username using a store subscription.
-  let currentUser;
+  // Helper: Returns a consistent key for a conversation between two users
+  function getConversationKey(user1, user2) {
+    return [user1, user2].sort().join("-");
+  }
+
+  // Monitor the username store
   username.subscribe((value) => {
     currentUser = value;
     if (currentUser) {
       fetchUsers();
     } else {
-      // Clear contacts and messages if user logs out.
       contacts = [];
       messages = [];
     }
   });
 
-  // Fetch all registered users from the "users" node.
-  async function fetchUsers() {
-    console.log("Fetching users for user:", currentUser);
+  // Fetch contacts from Gun.js in real time.
+  function fetchUsers() {
     uniqueAliases.clear();
     contacts = [];
     userCount = 0;
-
-    // Fetch profiles from "users" (not "alias").
     db.get("users")
       .map()
-      .once((profile, key) => {
-        console.log(`Fetched profile at key ${key}:`, profile);
+      .on((profile, key) => {
         if (profile && profile.alias) {
           uniqueAliases.add(profile.alias);
           userCount = uniqueAliases.size;
-          // Filter out the current user's alias.
-          contacts = [...uniqueAliases].filter((alias) => alias !== currentUser);
-          console.log("Updated: userCount=", userCount, "contacts=", contacts);
-        }
-      });
-
-    // Wait a short period to allow asynchronous loading.
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    console.log("Final fetch result: userCount=", userCount, "aliases=", [...uniqueAliases]);
-  }
-
-  // Load messages when a contact is selected.
-  function loadMessages() {
-    if (!selectedContact) return;
-    messages = []; // Clear previous messages.
-
-    // Listen for messages between the current user and the selected contact.
-    user
-      .get("messages")
-      .get(`${currentUser}-${selectedContact}`)
-      .map()
-      .on((data) => {
-        if (data) {
-          // Append each new message.
-          messages = [...messages, data];
+          contacts = [...uniqueAliases].filter(
+            (alias) => alias !== currentUser
+          );
         }
       });
   }
 
-  // Select a contact to chat with.
+  // When a contact is selected, update the conversation.
   function selectContact(contact) {
     selectedContact = contact;
     loadMessages();
   }
 
-  // For keyboard selection of contacts.
-  function handleKeydown(event, contact) {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      selectContact(contact);
+  // loadMessages subscribes to the conversation node and logs incoming messages.
+  function loadMessages() {
+    if (!currentUser || !selectedContact) {
+      console.log("Missing currentUser or selectedContact.");
+      return;
     }
-  }
 
-  // Send a message to the selected contact.
-  function sendMessage() {
-    if (!messageText.trim() || !selectedContact) return;
+    // Clear previous messages.
+    messages = [];
 
-    const message = {
-      sender: currentUser,
-      recipient: selectedContact,
-      text: messageText,
-      timestamp: Date.now(),
-    };
+    const conversationKey = getConversationKey(currentUser, selectedContact);
+    console.log("Listening on conversation key:", conversationKey);
+    console.log(
+      "currentUser:",
+      currentUser,
+      "selectedContact:",
+      selectedContact
+    );
 
-    // Store the message in both directions for synchronicity.
     user
       .get("messages")
-      .get(`${currentUser}-${selectedContact}`)
-      .set(message);
-    user
-      .get("messages")
-      .get(`${selectedContact}-${currentUser}`)
-      .set(message);
+      .get(conversationKey)
+      .map()
+      .on((data, key) => {
+        // Log the raw data in full for debugging:
+        console.log(`Raw data for key ${key}:`, JSON.stringify(data, null, 2));
 
-    messageText = "";
-  }
+        if (data && data.text) {
+          // Avoid duplicate messages in our local array.
+          if (!messages.find((msg) => msg.key === key)) {
+            messages = [...messages, { key, ...data }];
+          }
 
-  // Allow sending messages with the Enter key.
-  function handleKeypress(event) {
-    if (event.key === "Enter") sendMessage();
+          // Normalize the values for comparison.
+          const sender = (data.sender || "").trim().toLowerCase();
+          const recipient = (data.recipient || "").trim().toLowerCase();
+          const currentNorm = currentUser.trim().toLowerCase();
+          const contactNorm = selectedContact.trim().toLowerCase();
+
+          console.log(
+            "Normalized values - sender:",
+            sender,
+            ", recipient:",
+            recipient
+          );
+
+          // Log the message if it's sent by the current user to the selected contact.
+          if (sender === currentNorm && recipient === contactNorm) {
+            console.log(
+              `Message SENT by ${currentUser} to ${selectedContact}: "${data.text}"`
+            );
+          }
+          // Log the message if it's sent by the selected contact to the current user.
+          else if (sender === contactNorm && recipient === currentNorm) {
+            console.log(
+              `Message RECEIVED by ${currentUser} from ${selectedContact}: "${data.text}"`
+            );
+          }
+          // Otherwise, log that the message does not meet the expected conditions.
+          else {
+            console.log(
+              "Message does not match expected sender/recipient conditions:",
+              data
+            );
+          }
+        } else {
+          console.log("Received empty or invalid data for key:", key);
+        }
+      });
   }
 
   onMount(() => {
-    // On mount, if a user is logged in, fetch the available contacts.
-    if (currentUser) {
-      fetchUsers();
-    }
+    loadMessages();
+  });
+
+  onMount(() => {
+    if (currentUser) fetchUsers();
   });
 </script>
 
-<div class="min-h-screen bg-gray-100">
-  {#if $username}
-    <div class="chat-container flex h-screen max-w-6xl mx-auto">
-      <!-- Sidebar: Contact List -->
-      <div class="sidebar w-80 bg-white border-r border-gray-200">
-        <div class="p-4 border-b">
-          <h2 class="text-lg font-semibold">Messages</h2>
-          <p class="text-sm text-gray-600">Total Users: {userCount}</p>
-          <button on:click={fetchUsers} class="text-blue-500 hover:underline text-sm">
-            Refresh Users
-          </button>
-        </div>
-        <div class="divide-y" role="list">
+{#if $username}
+  <div class="full-screen-chat">
+    <div class="chat-container">
+      <!-- Left Sidebar: Contacts List -->
+      <aside class="sidebar">
+        <h2>Contacts</h2>
+        <p class="user-count">Total Users: {userCount}</p>
+        <button class="refresh-btn" on:click={fetchUsers}>
+          Refresh Users
+        </button>
+        <ul class="contacts-list">
           {#if contacts.length === 0}
-            <div class="p-4 text-gray-500">No contacts found</div>
+            <li class="no-contacts">No contacts found</li>
           {:else}
             {#each contacts as contact (contact)}
-              <button
-                type="button"
-                class="w-full text-left p-4 cursor-pointer hover:bg-gray-100 focus:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                class:selected={selectedContact === contact}
-                on:click={() => selectContact(contact)}
-                on:keydown={(e) => handleKeydown(e, contact)}
-                aria-label={`Select ${contact} to chat`}
-                aria-current={selectedContact === contact ? "true" : undefined}
-              >
-                {contact}
-              </button>
+              <li>
+                <button
+                  class="contact-btn"
+                  on:click={() => selectContact(contact)}
+                  title={`Chat with ${contact}`}
+                >
+                  {contact}
+                </button>
+              </li>
             {/each}
           {/if}
-        </div>
-      </div>
-
-      <!-- Chat Window -->
-      <div class="chat-window flex-1 bg-white flex flex-col">
+        </ul>
+      </aside>
+      <!-- Right Panel: Chat Window -->
+      <section class="chat-window">
         {#if selectedContact}
-          <div class="messages flex-1 overflow-y-auto p-5">
+          <header class="chat-header"><h3>{selectedContact}</h3></header>
+          <!-- Old messages container -->
+          <div class="old-messages">
             {#each messages as msg (msg.timestamp)}
               <div
-                class="message mb-2 p-2 rounded-lg max-w-[70%]"
-                class:sent={msg.sender === currentUser}
-                class:received={msg.sender !== currentUser}
+                class="message {msg.sender === currentUser
+                  ? 'sent'
+                  : 'received'}"
               >
                 {msg.text}
               </div>
             {/each}
           </div>
-          <div class="message-input flex p-2 border-t border-gray-200">
-            <input
-              type="text"
-              bind:value={messageText}
-              on:keypress={handleKeypress}
-              class="flex-1 p-2 border rounded-l-lg"
-              placeholder="Type a message..."
-            />
-            <button on:click={sendMessage} class="bg-blue-500 text-white p-2 rounded-r-lg">
-              Send
-            </button>
-          </div>
+          <!-- Message input area from ChatMessage.svelte -->
+          <ChatMessage {currentUser} {selectedContact} />
         {:else}
-          <div class="flex-1 flex items-center justify-center text-gray-500">
-            Select a contact to start chatting
-          </div>
+          <div class="no-chat"><p>Select a contact to start chatting.</p></div>
         {/if}
-      </div>
+      </section>
     </div>
-  {:else}
-    <main class="flex items-center justify-center min-h-screen">
-      <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
-        <h1 class="text-2xl font-bold mb-6 text-center">Welcome</h1>
-        <Login />
-      </div>
-    </main>
-  {/if}
-</div>
+  </div>
+{:else}
+  <Login />
+{/if}
 
 <style>
-  .selected {
-    background-color: #f0f0f0;
-    font-weight: 600;
+  :global(#app) {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: left !important;
+  }
+  .full-screen-chat {
+    width: 100vw;
+    height: 100vh;
+    background-color: #fff;
+    color: #000;
+  }
+  .chat-container {
+    display: flex;
+    height: 100%;
+  } /* Left Sidebar */
+  .sidebar {
+    width: 320px;
+    background-color: #fff;
+    border-right: 1px solid #ccc;
+    padding: 16px;
+  }
+  .sidebar h2 {
+    margin: 0 0 8px;
+    font-size: 1.5em;
+  }
+  .user-count {
+    font-size: 0.9em;
+    margin-bottom: 12px;
+  }
+  .refresh-btn {
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 4px;
+    background-color: #007aff;
+    color: #fff;
+    cursor: pointer;
+  }
+  .contacts-list,
+  .contacts-list li {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .contacts-list li {
+    margin-bottom: 8px;
+  }
+  .contact-btn {
+    width: 100%;
+    text-align: left;
+    padding: 10px;
+    background-color: #f5f5f5;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+  }
+  .contact-btn:hover {
+    background-color: #e0e0e0;
+  }
+  .no-contacts {
+    font-size: 0.9em;
+    color: #888;
+  } /* Right Panel */
+  .chat-window {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: #fff;
+  }
+  .chat-header {
+    padding: 16px;
+    border-bottom: 1px solid #ccc;
+  }
+  .chat-header h3 {
+    margin: 0;
+    font-size: 1.25em;
+  }
+  .old-messages {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+    background-color: #f9f9f9;
+  }
+  .message {
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    border-radius: 12px;
+    max-width: 70%;
+    word-wrap: break-word;
   }
   .message.sent {
-    background-color: #3b82f6;
-    color: #fff;
+    background-color: #dbf4ff;
     margin-left: auto;
   }
   .message.received {
-    background-color: #e5e7eb;
-    color: #000;
-    margin-right: auto;
+    background-color: #e5e5ea;
+  }
+  .no-chat {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.1em;
+    color: #666;
   }
 </style>
