@@ -1,19 +1,35 @@
 <script>
   import { onMount } from "svelte";
   import { user, username, db } from "./user";
-  import ChatMessage from "./ChatMessage.svelte";
   import Login from "./Login.svelte";
+  import SEA from 'gun/sea';
 
   let currentUser = "";
-  let selectedContact = "";
+  let selectedContact = null;
   let contacts = [];
   let userCount = 0;
   let uniqueAliases = new Set();
   let messages = [];
+  let newMessage = '';
 
   // Helper: Returns a consistent key for a conversation between two users
   function getConversationKey(user1, user2) {
     return [user1, user2].sort().join("-");
+  }
+
+  // Helper: Generate a shared secret for encryption
+  async function getSharedSecret(contactEpub) {
+    try {
+      const userPair = user._.sea; // Current user's keypair
+      if (!userPair || !userPair.epub || !userPair.priv) {
+        throw new Error("User keypair not available");
+      }
+      const secret = await SEA.secret(contactEpub, userPair);
+      return secret;
+    } catch (error) {
+      console.error("Error generating shared secret:", error);
+      return null;
+    }
   }
 
   // Monitor the username store
@@ -27,104 +43,92 @@
     }
   });
 
-  // Fetch contacts from Gun.js in real time.
-  function fetchUsers() {
+  // Fetch contacts with encryption public keys
+  async function fetchUsers() {
     uniqueAliases.clear();
     contacts = [];
     userCount = 0;
     db.get("users")
       .map()
       .on((profile, key) => {
-        if (profile && profile.alias) {
-          uniqueAliases.add(profile.alias);
+        console.log("Fetched profile:", key, profile); // Debug log
+        if (profile && profile.alias && profile.epub) {
+          uniqueAliases.add(JSON.stringify({ alias: profile.alias, epub: profile.epub }));
           userCount = uniqueAliases.size;
-          contacts = [...uniqueAliases].filter(
-            (alias) => alias !== currentUser
-          );
+          contacts = [...uniqueAliases]
+            .map(item => JSON.parse(item))
+            .filter(contact => contact.alias !== currentUser);
         }
       });
   }
 
-  // When a contact is selected, update the conversation.
+  // Select a contact and load messages
   function selectContact(contact) {
     selectedContact = contact;
     loadMessages();
   }
 
-  // loadMessages subscribes to the conversation node and logs incoming messages.
-  function loadMessages() {
-    if (!currentUser || !selectedContact) {
-      console.log("Missing currentUser or selectedContact.");
+  // Load and decrypt messages
+  async function loadMessages() {
+    if (!currentUser || !selectedContact || !selectedContact.epub) {
+      console.log("Missing currentUser, selectedContact, or epub");
       return;
     }
 
-    // Clear previous messages.
     messages = [];
 
-    const conversationKey = getConversationKey(currentUser, selectedContact);
+    const conversationKey = getConversationKey(currentUser, selectedContact.alias);
     console.log("Listening on conversation key:", conversationKey);
-    console.log(
-      "currentUser:",
-      currentUser,
-      "selectedContact:",
-      selectedContact
-    );
 
-    user
-      .get("messages")
-      .get(conversationKey)
-      .map()
-      .on((data, key) => {
-        // Log the raw data in full for debugging:
-        console.log(`Raw data for key ${key}:`, JSON.stringify(data, null, 2));
+    const secret = await getSharedSecret(selectedContact.epub);
+    if (!secret) {
+      console.error("Cannot load messages: shared secret unavailable");
+      return;
+    }
 
-        if (data && data.text) {
-          // Avoid duplicate messages in our local array.
-          if (!messages.find((msg) => msg.key === key)) {
-            messages = [...messages, { key, ...data }];
+    db.get("chats").get(conversationKey).map().on(async (data, key) => {
+      if (data && data.text) {
+        console.log("Encrypted text:", data.text); // Debug log
+        try {
+          const decryptedText = await SEA.decrypt(data.text, secret);
+          if (decryptedText && !messages.find((msg) => msg.timestamp === data.timestamp)) {
+            messages = [...messages, { key, ...data, text: decryptedText }]
+              // @ts-ignore
+              .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
           }
-
-          // Normalize the values for comparison.
-          const sender = (data.sender || "").trim().toLowerCase();
-          const recipient = (data.recipient || "").trim().toLowerCase();
-          const currentNorm = currentUser.trim().toLowerCase();
-          const contactNorm = selectedContact.trim().toLowerCase();
-
-          console.log(
-            "Normalized values - sender:",
-            sender,
-            ", recipient:",
-            recipient
-          );
-
-          // Log the message if it's sent by the current user to the selected contact.
-          if (sender === currentNorm && recipient === contactNorm) {
-            console.log(
-              `Message SENT by ${currentUser} to ${selectedContact}: "${data.text}"`
-            );
-          }
-          // Log the message if it's sent by the selected contact to the current user.
-          else if (sender === contactNorm && recipient === currentNorm) {
-            console.log(
-              `Message RECEIVED by ${currentUser} from ${selectedContact}: "${data.text}"`
-            );
-          }
-          // Otherwise, log that the message does not meet the expected conditions.
-          else {
-            console.log(
-              "Message does not match expected sender/recipient conditions:",
-              data
-            );
-          }
-        } else {
-          console.log("Received empty or invalid data for key:", key);
+        } catch (error) {
+          console.error("Error decrypting message:", error);
         }
-      });
+      }
+    });
   }
 
-  onMount(() => {
-    loadMessages();
-  });
+  // Send an encrypted message
+  async function sendMessage() {
+    if (!newMessage.trim() || !currentUser || !selectedContact || !selectedContact.epub) return;
+
+    const conversationKey = getConversationKey(currentUser, selectedContact.alias);
+    const timestamp = new Date().toISOString();
+
+    const secret = await getSharedSecret(selectedContact.epub);
+    if (!secret) {
+      console.error("Cannot send message: shared secret unavailable");
+      return;
+    }
+
+    const encryptedText = await SEA.encrypt(newMessage, secret);
+    console.log("Storing encrypted text:", encryptedText); // Debug log
+
+    // Store message as a sub-node
+    db.get("chats").get(conversationKey).get(timestamp).put({
+      text: encryptedText,
+      sender: currentUser,
+      recipient: selectedContact.alias,
+      timestamp: timestamp
+    });
+
+    newMessage = '';
+  }
 
   onMount(() => {
     if (currentUser) fetchUsers();
@@ -145,14 +149,14 @@
           {#if contacts.length === 0}
             <li class="no-contacts">No contacts found</li>
           {:else}
-            {#each contacts as contact (contact)}
+            {#each contacts as contact (contact.alias)}
               <li>
                 <button
                   class="contact-btn"
                   on:click={() => selectContact(contact)}
-                  title={`Chat with ${contact}`}
+                  title={`Chat with ${contact.alias}`}
                 >
-                  {contact}
+                  {contact.alias}
                 </button>
               </li>
             {/each}
@@ -162,7 +166,7 @@
       <!-- Right Panel: Chat Window -->
       <section class="chat-window">
         {#if selectedContact}
-          <header class="chat-header"><h3>{selectedContact}</h3></header>
+          <header class="chat-header"><h3>{selectedContact.alias}</h3></header>
           <!-- Old messages container -->
           <div class="old-messages">
             {#each messages as msg (msg.timestamp)}
@@ -175,8 +179,16 @@
               </div>
             {/each}
           </div>
-          <!-- Message input area from ChatMessage.svelte -->
-          <ChatMessage {currentUser} {selectedContact} />
+          <!-- Message input area -->
+          <form on:submit|preventDefault={sendMessage}>
+            <input
+              type="text"
+              placeholder="Type a message..."
+              bind:value={newMessage}
+              maxlength="100"
+            />
+            <button type="submit" disabled={!newMessage.trim()}>Send</button>
+          </form>
         {:else}
           <div class="no-chat"><p>Select a contact to start chatting.</p></div>
         {/if}
@@ -203,7 +215,7 @@
   .chat-container {
     display: flex;
     height: 100%;
-  } /* Left Sidebar */
+  }
   .sidebar {
     width: 320px;
     background-color: #fff;
@@ -252,7 +264,7 @@
   .no-contacts {
     font-size: 0.9em;
     color: #888;
-  } /* Right Panel */
+  }
   .chat-window {
     flex: 1;
     display: flex;
@@ -294,5 +306,30 @@
     align-items: center;
     font-size: 1.1em;
     color: #666;
+  }
+  form {
+    display: flex;
+    padding: 16px;
+    border-top: 1px solid #ccc;
+    background-color: #fff;
+  }
+  input {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-right: 8px;
+  }
+  button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    background-color: #007aff;
+    color: #fff;
+    cursor: pointer;
+  }
+  button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
   }
 </style>

@@ -6,11 +6,7 @@
   import Gun from "gun";
 
   // Initialize Gun: only connect to our local Gun server.
-  const gun = Gun({
-    peers: ["http://localhost:8765/gun"],
-    radisk: false, // Disable persistent storage for testing deletions
-    localStorage: false,
-  });
+  const gun = Gun(['http://localhost:9876/gun']);
 
   // Sign out function.
   function signout() {
