@@ -3,6 +3,7 @@
   import { user, username, db } from "./user";
   import Login from "./Login.svelte";
   import SEA from 'gun/sea';
+  import '../app.css';
 
   let currentUser = "";
   let selectedContact = null;
@@ -140,7 +141,7 @@
     <div class="chat-container">
       <!-- Left Sidebar: Contacts List -->
       <aside class="sidebar">
-        <h2>Contacts</h2>
+        <span class="current-user"><strong style="color: white;">{$username}</strong></span>
         <p class="user-count">Total Users: {userCount}</p>
         <button class="refresh-btn" on:click={fetchUsers}>
           Refresh Users
@@ -198,138 +199,3 @@
 {:else}
   <Login />
 {/if}
-
-<style>
-  :global(#app) {
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    text-align: left !important;
-  }
-  .full-screen-chat {
-    width: 100vw;
-    height: 100vh;
-    background-color: #fff;
-    color: #000;
-  }
-  .chat-container {
-    display: flex;
-    height: 100%;
-  }
-  .sidebar {
-    width: 320px;
-    background-color: #fff;
-    border-right: 1px solid #ccc;
-    padding: 16px;
-  }
-  .sidebar h2 {
-    margin: 0 0 8px;
-    font-size: 1.5em;
-  }
-  .user-count {
-    font-size: 0.9em;
-    margin-bottom: 12px;
-  }
-  .refresh-btn {
-    margin-bottom: 16px;
-    padding: 8px 12px;
-    border: none;
-    border-radius: 4px;
-    background-color: #007aff;
-    color: #fff;
-    cursor: pointer;
-  }
-  .contacts-list,
-  .contacts-list li {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-  .contacts-list li {
-    margin-bottom: 8px;
-  }
-  .contact-btn {
-    width: 100%;
-    text-align: left;
-    padding: 10px;
-    background-color: #f5f5f5;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 1rem;
-  }
-  .contact-btn:hover {
-    background-color: #e0e0e0;
-  }
-  .no-contacts {
-    font-size: 0.9em;
-    color: #888;
-  }
-  .chat-window {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    background-color: #fff;
-  }
-  .chat-header {
-    padding: 16px;
-    border-bottom: 1px solid #ccc;
-  }
-  .chat-header h3 {
-    margin: 0;
-    font-size: 1.25em;
-  }
-  .old-messages {
-    flex: 1;
-    padding: 16px;
-    overflow-y: auto;
-    background-color: #f9f9f9;
-  }
-  .message {
-    padding: 8px 12px;
-    margin-bottom: 8px;
-    border-radius: 12px;
-    max-width: 70%;
-    word-wrap: break-word;
-  }
-  .message.sent {
-    background-color: #dbf4ff;
-    margin-left: auto;
-  }
-  .message.received {
-    background-color: #e5e5ea;
-  }
-  .no-chat {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 1.1em;
-    color: #666;
-  }
-  form {
-    display: flex;
-    padding: 16px;
-    border-top: 1px solid #ccc;
-    background-color: #fff;
-  }
-  input {
-    flex: 1;
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    margin-right: 8px;
-  }
-  button {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 4px;
-    background-color: #007aff;
-    color: #fff;
-    cursor: pointer;
-  }
-  button:disabled {
-    background-color: #ccc;
-    cursor: not-allowed;
-  }
-</style>

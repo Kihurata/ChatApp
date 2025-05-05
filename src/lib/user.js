@@ -11,6 +11,8 @@ user.get("alias").on((v) => username.set(v));
 db.on("auth", async (event) => {
   const alias = await user.get("alias");
   username.set(alias);
-  console.log(`signed in as ${alias}`);
+  console.log(`signed in as ${alias}`);``
 });
 // https://grok.com/chat/0ebc4c03-2b0b-4975-b40f-310d7d9d45a9
+// account:
+// minhquan, thanhviet

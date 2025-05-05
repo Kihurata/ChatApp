@@ -1,79 +1,352 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+/* Import Open Sans from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;700&display=swap');
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
-body {
+/* Global resets for full-screen layout */
+html, body, #app {
   margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Open Sans', sans-serif; /* Apply Open Sans globally */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Chat.svelte styles */
+.full-screen-chat {
+  width: 100vw;
+  height: 100vh;
+  background-color: #fff;
+  color: white;
   display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  flex-direction: column;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+.chat-container {
+  display: flex;
+  flex: 1;
+  width: 100%;
+  height: 100%;
 }
 
-.card {
-  padding: 2em;
+.sidebar {
+  width: 25%;
+  min-width: 200px;
+  background-color: black;
+  border-right: 0.1px solid #4b4949;
+  padding: 16px;
+  overflow-y: auto;
 }
 
-#app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+.sidebar h2 {
+  margin: 0 0 8px;
+  font-size: 1.5em;
+  font-weight: 700; /* Open Sans Bold */
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
+.user-count {
+  font-size: 0.9em;
+  margin-bottom: 12px;
+  font-weight: 400; /* Open Sans Regular */
+}
+
+.refresh-btn {
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 4px;
+  background-color: #007aff;
+  color: #fff;
   cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  width: 100%;
+  font-weight: 500; /* Open Sans Medium */
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
+.contacts-list,
+.contacts-list li {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.contacts-list li {
+  margin-bottom: 8px;
+}
+
+.contact-btn {
+  width: 100%;
+  text-align: left;
+  padding: 10px;
+  background-color: #f5f5f5;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 400; /* Open Sans Regular */
+}
+
+.contact-btn:hover {
+  background-color: #e0e0e0;
+}
+
+.no-contacts {
+  font-size: 0.9em;
+  color: #888;
+  font-weight: 400; /* Open Sans Regular */
+}
+
+.chat-window {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: black;
+}
+
+.chat-header {
+  padding: 16px;
+  width: 100%;
+}
+
+.chat-header h3 {
+  margin: 0;
+  font-size: 1.25em;
+  font-weight: 700; /* Open Sans Bold */
+}
+
+.old-messages {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  background-color: black;
+}
+
+.message {
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  max-width: 70%;
+  word-wrap: break-word;
+  font-weight: 400; /* Open Sans Regular */
+}
+
+.message.sent {
+  background-color: rgb(55, 151, 240);
+  margin-left: auto;
+}
+
+.message.received {
+  background-color: rgb(38,38,38);
+}
+
+.no-chat {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.1em;
+  color: white;
+  font-weight: 400; /* Open Sans Regular */
+}
+
+.chat-window form {
+  display: flex;
+  padding: 16px;
+  border-top: 1px solid #ccc;
+  background-color: #fff;
+  width: 100%;
+}
+
+.chat-window input {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  margin-right: 8px;
+  font-weight: 400; /* Open Sans Regular */
+}
+
+.chat-window button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  background-color: #007aff;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 500; /* Open Sans Medium */
+}
+
+.chat-window button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+/* Responsive adjustments for Chat.svelte */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 40%;
+    min-width: 150px;
   }
 }
+
+@media (max-width: 480px) {
+  .sidebar {
+    width: 100%;
+    position: absolute;
+    z-index: 10;
+    display: none; /* Hide by default, can be toggled */
+  }
+
+  .chat-window {
+    width: 100%;
+  }
+}
+
+/* ChatMessage.svelte styles */
+.message-input {
+  display: flex;
+  width: 100%;
+  padding: 16px;
+  border-top: 1px solid #ccc;
+  background-color: #fff;
+}
+
+.message-input input {
+  flex: 1;
+  padding: 8px;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 4px 0 0 4px;
+  font-weight: 400; /* Open Sans Regular */
+}
+
+.message-input button {
+  padding: 8px 16px;
+  font-size: 1rem;
+  border: none;
+  background-color: #007aff;
+  color: #fff;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  font-weight: 500; /* Open Sans Medium */
+}
+
+.message-input button:hover {
+  background-color: #005bb5;
+}
+
+/* Header.svelte styles */
+header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background-color: black;
+  color: white;
+  flex-wrap: wrap;
+  border-bottom: 0.1px solid #4b4949;
+}
+
+.user-bio {
+  margin-bottom: 10px;
+  font-weight: 400; /* Open Sans Regular */
+}
+
+header button {
+  width: auto;
+  min-width: 100px;
+  margin: 5px;
+  padding: 8px 16px;
+  font-size: 1rem;
+  border: none;
+  border-radius: 4px;
+  background-color: #ff3b30;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  font-weight: 500; /* Open Sans Medium */
+}
+
+header button:hover {
+  background-color: #e02e25;
+}
+
+header ul {
+  list-style: none;
+  padding: 0;
+}
+
+header li {
+  font-size: 0.9rem;
+  font-weight: 400; /* Open Sans Regular */
+}
+
+/* Login.svelte styles */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.form-group {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  text-align: left;
+  font-size: 0.875rem;
+  font-weight: 500; /* Open Sans Medium */
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-weight: 400; /* Open Sans Regular */
+}
+
+.button-group {
+  width: 100%;
+  display: flex;
+  gap: 16px;
+}
+
+.button-group button {
+  flex: 1;
+  padding: 8px;
+  border-radius: 4px;
+  font-weight: 500; /* Open Sans Medium */
+}
+
+.button-group button:first-child {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.button-group button:first-child:hover {
+  background-color: #2563eb;
+}
+
+.button-group button:last-child {
+  background-color: #e5e7eb;
+  color: #1f2937;
+}
+
+.button-group button:last-child:hover {
+  background-color: #d1d5db;
+}
+

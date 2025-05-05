@@ -1,8 +1,8 @@
 <script>
   // @ts-nocheck
   import { onMount } from "svelte";
-  import { username } from "./user"; // assuming username is a Svelte store
-  // Note: We no longer use "user" for deletion commands; we work directly with our Gun instance.
+  import { username } from "./user";
+  import '../app.css';
   import Gun from "gun";
 
   // Initialize Gun: only connect to our local Gun server.
@@ -70,14 +70,7 @@
   <h1>Chat App</h1>
   {#if $username}
     <div class="user-bio">
-      <span>Hello <strong>{$username}</strong></span>
     </div>
-    <p>Connected peers: {peerCount}</p>
-    <ul>
-      {#each peersList as peer}
-        <li>{peer}</li>
-      {/each}
-    </ul>
     <button class="signout-button" on:click={signout}>Sign Out</button>
     <button class="signout-button" on:click={deleteData}>Delete All Data</button
     >
@@ -85,39 +78,3 @@
     <h3>Gun.js Chat</h3>
   {/if}
 </header>
-
-<style>
-  header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px;
-    background-color: #007aff;
-    color: white;
-    flex-direction: column;
-  }
-  .user-bio {
-    margin-bottom: 10px;
-  }
-  button {
-    margin: 5px;
-    padding: 8px 16px;
-    font-size: 1rem;
-    border: none;
-    border-radius: 4px;
-    background-color: #ff3b30;
-    color: white;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-  }
-  button:hover {
-    background-color: #e02e25;
-  }
-  ul {
-    list-style: none;
-    padding: 0;
-  }
-  li {
-    font-size: 0.9rem;
-  }
-</style>
