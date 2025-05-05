@@ -2,11 +2,11 @@
   // @ts-nocheck
   import { onMount } from "svelte";
   import { username } from "./user";
-  import '../app.css';
+  import "../app.css";
   import Gun from "gun";
 
   // Initialize Gun: only connect to our local Gun server.
-  const gun = Gun(['http://localhost:9876/gun']);
+  const gun = Gun(["http://localhost:9876/gun"]);
 
   // Sign out function.
   function signout() {
@@ -68,12 +68,17 @@
 
 <header>
   <h1>Chat App</h1>
+  <span class="current-user"
+    ><strong style="color: white;">{$username}</strong></span
+  >
   {#if $username}
-    <div class="user-bio">
+    <div class="user-bio"></div>
+    <div class="button-container">
+      <button class="signout-button" on:click={signout}>Sign Out</button>
+      <button class="delete-button" on:click={deleteData}
+        >Delete All Data</button
+      >
     </div>
-    <button class="signout-button" on:click={signout}>Sign Out</button>
-    <button class="signout-button" on:click={deleteData}>Delete All Data</button
-    >
   {:else}
     <h3>Gun.js Chat</h3>
   {/if}
